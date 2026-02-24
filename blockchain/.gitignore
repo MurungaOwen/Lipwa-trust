@@ -1,0 +1,65 @@
+# ------------------------------------------------------------
+# Secrets and environment files
+# ------------------------------------------------------------
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.sample
+
+**/.secrets
+**/.secrets.*
+*.pem
+*.key
+*.p12
+*.pfx
+
+# ------------------------------------------------------------
+# Node / TypeScript artifacts
+# ------------------------------------------------------------
+**/node_modules/
+**/dist/
+**/build/
+**/.cache/
+**/coverage/
+**/.nyc_output/
+**/*.tsbuildinfo
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ------------------------------------------------------------
+# Rust / Soroban artifacts
+# ------------------------------------------------------------
+**/target/
+**/.cargo/
+**/.soroban/
+**/.stellar/
+**/.stellar-cli/
+
+# ------------------------------------------------------------
+# Postman local/private files
+# ------------------------------------------------------------
+**/postman/*.local.postman_environment.json
+**/postman/*.private.postman_environment.json
+
+# ------------------------------------------------------------
+# Temporary and runtime files
+# ------------------------------------------------------------
+**/tmp/
+**/.tmp/
+**/logs/
+**/*.log
+**/.DS_Store
+Thumbs.db
+
+# ------------------------------------------------------------
+# IDE / editor files
+# ------------------------------------------------------------
+**/.idea/
+**/.vscode/
+**/*.swp
+**/*.swo
+**/*~
