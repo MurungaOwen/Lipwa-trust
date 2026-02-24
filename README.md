@@ -1,100 +1,87 @@
-## Lipwa-Trust
+# 💸 Lipwa‑Trust
 
-Automated Supply Chain Financing for Informal Retailers
+**Automated Supply Chain Financing for Informal Retailers**
 
-### Overview
+***
 
-Lipwa-Trust is a closed-loop inventory financing platform that enables small retailers (“kibandas”) to access inventory credit based on verified daily sales data.
+## Overview
 
-The platform leverages:
-- Pay Hero payment data
-- AI-driven trust scoring
-- Stellar smart contracts
-- Automated revenue-based repayment
+**Lipwa‑Trust** is a closed‑loop inventory financing platform that enables small informal retailers (commonly known as *kibandas*) to access inventory credit based on verified daily sales data.  
 
- ### Problem
+The platform combines **AI‑driven credit scoring**, **blockchain smart contracts**, and **automated repayment systems** to create trust‑based financing for the informal economy.
 
-Small informal retailers in Kenya lack access to affordable working capital due to:
+### Key Technologies
+- **Pay Hero integration** – captures verified payment and sales data  
+- **AI‑driven Trust Score** – dynamic credit scoring based on merchant performance  
+- **Stellar smart contracts (Soroban)** – manages settlement and guarantees  
+- **Automated revenue‑based repayment** – aligns credit with daily earnings  
 
-- No collateral
+***
 
-- No audited financial records
+## Problem
 
-- Cash-based operations
+Small retailers in Kenya face persistent barriers to financing:
 
-- High default risk perception
+- Lack of collateral or formal banking history  
+- Absence of audited financial records  
+- Predominantly cash‑based operations  
+- High perceived default risk by lenders  
+- Limited supplier willingness to offer credit without trust mechanisms  
 
-- Suppliers are unwilling to extend credit without trust guarantees.
+***
 
-### Solution
+## Solution
 
-Lipwa-Trust creates a programmable financing loop:
+Lipwa‑Trust introduces a **programmable financing loop**:
 
-- Daily sales captured via Pay Hero.
+1. Daily sales are captured via **Pay Hero**.  
+2. An **AI model** generates a merchant’s dynamic **Trust Score**.  
+3. The merchant requests inventory financing.  
+4. A **smart contract** is issued on **Stellar (Soroban)** to manage the transaction.  
+5. **Automated repayment** occurs through real‑time revenue inflows.  
 
-- AI model generates dynamic Trust Score.
+This closed‑loop model minimizes default risk and enables scalable, data‑driven credit for small merchants.
 
-- Merchant requests inventory.
+***
 
-- Smart contract issued on Stellar.
+## System Architecture
 
-- Automatic repayment from daily inflows.
+### 🧠 Backend
+- **Node.js / NestJS/ python** – core APIs and logic  
+- **Python** – AI scoring and risk modeling  
+- **PostgreSQL** – persistent data storage  
+- **Redis** – real‑time computation and caching  
 
-This reduces default risk and enables scalable inventory financing.
+### 🔗 Blockchain Layer
+- **Stellar Soroban smart contracts**  
+- **Stablecoin‑based settlements**  
+- **Automated revenue routing and escrow management**
 
-### Architecture
-#### Backend
+### 💻 Frontend
+- **Next.js + Tailwind CSS / vite react** – responsive dashboard UI  
+- **API integration layer** – connects backend & blockchain services  
 
-Node.js / NestJS / Python
+***
 
-PostgreSQL
+## Core Features
+- Real‑time **Trust Score** generation  
+- **Revenue‑based** credit limit adjustment  
+- Smart contract‑driven inventory financing  
+- **Automated repayment routing** from sales inflows  
+- Supplier visibility dashboard with performance insights  
 
-AI scoring module (Python)
+***
 
-Blockchain Layer
+## Impact
+- Enables **bulk purchasing** by small retailers  
+- Improves **profit margins** and inventory flow  
+- Reduces **supplier default risk** through verified repayment logic  
+- Builds programmable **B2B financing rails** for the informal economy  
 
-Stellar Soroban smart contracts
+***
 
-Stablecoin-based settlement
-
-Automated revenue routing
-
-#### Frontend
-
-Next.js
-
-Tailwind
-
-Dashboard-based UI
-
-Core Features
-
-Real-time Trust Score
-
-Revenue-based credit limit
-
-Smart contract inventory financing
-
-Automated repayment routing
-
-Supplier visibility dashboard
-
-#### Impact
-
-Enables bulk purchasing
-
-Improves retailer margins
-
-Reduces supplier default risk
-
-Creates programmable B2B finance rails
-
-#### Future Roadmap
-
-Multi-supplier marketplace
-
-Cross-border supplier payments
-
-On-chain credit history NFT
-
-Embedded insurance layer
+## Future Roadmap
+- Multi‑supplier marketplace integration  
+- Cross‑border supplier payments via Stellar network  
+- On‑chain **credit history NFTs** for each merchant  
+- Embedded **micro‑insurance** and risk‑sharing layer  
