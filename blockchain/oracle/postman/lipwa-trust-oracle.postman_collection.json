@@ -1,0 +1,543 @@
+{
+  "info": {
+    "name": "Lipwa Trust Oracle API",
+    "description": "Postman collection for the Lipwa Trust Oracle REST API.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "7b28aeb2-0f61-4c04-9f97-bf927f72bb32"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Get Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Health check endpoint."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Wallets",
+      "item": [
+        {
+          "name": "Create Merchant Wallet",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "var data = pm.response.json();",
+                  "if (data.walletId) {",
+                  "  pm.collectionVariables.set('merchantWalletId', data.walletId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"merchant\",\n  \"ownerId\": \"{{merchantOwnerId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wallets/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wallets",
+                "create"
+              ]
+            },
+            "description": "Creates a merchant wallet and stores walletId to merchantWalletId."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Supplier Wallet",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "var data = pm.response.json();",
+                  "if (data.walletId) {",
+                  "  pm.collectionVariables.set('supplierWalletId', data.walletId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"supplier\",\n  \"ownerId\": \"{{supplierOwnerId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wallets/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wallets",
+                "create"
+              ]
+            },
+            "description": "Creates a supplier wallet and stores walletId to supplierWalletId."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Platform Wallet",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "var data = pm.response.json();",
+                  "if (data.walletId) {",
+                  "  pm.collectionVariables.set('platformWalletId', data.walletId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"platform\",\n  \"ownerId\": \"{{platformOwnerId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/wallets/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wallets",
+                "create"
+              ]
+            },
+            "description": "Creates a platform wallet and stores walletId to platformWalletId."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Wallet By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/wallets/{{walletId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "wallets",
+                "{{walletId}}"
+              ]
+            },
+            "description": "Fetch a wallet using walletId variable."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Contracts",
+      "item": [
+        {
+          "name": "Create Contract",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "var data = pm.response.json();",
+                  "if (data.contractId) {",
+                  "  pm.collectionVariables.set('contractId', data.contractId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"merchantWalletId\": \"{{merchantWalletId}}\",\n  \"supplierWalletId\": \"{{supplierWalletId}}\",\n  \"amount\": {{contractAmount}},\n  \"dispatchDeadlineHours\": {{dispatchDeadlineHours}}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/contracts/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contracts",
+                "create"
+              ]
+            },
+            "description": "Creates a credit contract and stores contractId."
+          },
+          "response": []
+        },
+        {
+          "name": "Fund Escrow",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fromWalletId\": \"{{platformWalletId}}\",\n  \"amount\": {{fundAmount}}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/contracts/{{contractId}}/fund",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contracts",
+                "{{contractId}}",
+                "fund"
+              ]
+            },
+            "description": "Funds escrow for the contract."
+          },
+          "response": []
+        },
+        {
+          "name": "Dispatch Goods",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"supplierWalletId\": \"{{supplierWalletId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/contracts/{{contractId}}/dispatch",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contracts",
+                "{{contractId}}",
+                "dispatch"
+              ]
+            },
+            "description": "Supplier marks goods as dispatched."
+          },
+          "response": []
+        },
+        {
+          "name": "Confirm Delivery",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"merchantWalletId\": \"{{merchantWalletId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/contracts/{{contractId}}/deliver",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contracts",
+                "{{contractId}}",
+                "deliver"
+              ]
+            },
+            "description": "Merchant confirms delivery and triggers payout."
+          },
+          "response": []
+        },
+        {
+          "name": "Record Repayment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": {{repaymentAmount}}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/contracts/{{contractId}}/repay",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contracts",
+                "{{contractId}}",
+                "repay"
+              ]
+            },
+            "description": "Records a repayment installment."
+          },
+          "response": []
+        },
+        {
+          "name": "Settle Contract",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contracts/{{contractId}}/settle",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contracts",
+                "{{contractId}}",
+                "settle"
+              ]
+            },
+            "description": "Finalizes a fully repaid contract."
+          },
+          "response": []
+        },
+        {
+          "name": "Raise Dispute",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"{{disputeReason}}\",\n  \"raisedBy\": \"{{raisedBy}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/contracts/{{contractId}}/dispute",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contracts",
+                "{{contractId}}",
+                "dispute"
+              ]
+            },
+            "description": "Raises a contract dispute. Set raisedBy to platform, merchant, or a walletId."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Contract",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contracts/{{contractId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contracts",
+                "{{contractId}}",
+                "cancel"
+              ]
+            },
+            "description": "Cancels a contract and refunds escrow based on contract state."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Contract Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/contracts/{{contractId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contracts",
+                "{{contractId}}",
+                "status"
+              ]
+            },
+            "description": "Fetches current on-chain state for the contract."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Contract Events",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/contracts/{{contractId}}/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contracts",
+                "{{contractId}}",
+                "events"
+              ]
+            },
+            "description": "Fetches contract audit events."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3001"
+    },
+    {
+      "key": "merchantOwnerId",
+      "value": "merchant-user-001"
+    },
+    {
+      "key": "supplierOwnerId",
+      "value": "supplier-user-001"
+    },
+    {
+      "key": "platformOwnerId",
+      "value": "platform-user-001"
+    },
+    {
+      "key": "merchantWalletId",
+      "value": ""
+    },
+    {
+      "key": "supplierWalletId",
+      "value": ""
+    },
+    {
+      "key": "platformWalletId",
+      "value": ""
+    },
+    {
+      "key": "walletId",
+      "value": ""
+    },
+    {
+      "key": "contractId",
+      "value": ""
+    },
+    {
+      "key": "contractAmount",
+      "value": "5000"
+    },
+    {
+      "key": "dispatchDeadlineHours",
+      "value": "24"
+    },
+    {
+      "key": "fundAmount",
+      "value": "5000"
+    },
+    {
+      "key": "repaymentAmount",
+      "value": "1000"
+    },
+    {
+      "key": "disputeReason",
+      "value": "Supplier did not dispatch in time"
+    },
+    {
+      "key": "raisedBy",
+      "value": "platform"
+    }
+  ]
+}
