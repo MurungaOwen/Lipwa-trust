@@ -1,0 +1,31 @@
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+
+.card:hover { border-color: #2e3347; }
+
+.card-accent {
+  border-color: rgba(201, 168, 76, 0.3);
+  background: linear-gradient(135deg, var(--surface) 0%, rgba(201, 168, 76, 0.05) 100%);
+}
+
+.card-header {
+  padding: 20px 24px 0;
+}
+
+.card-title {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.card-body {
+  padding: 16px 24px 24px;
+}

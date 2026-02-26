@@ -1,14 +1,56 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import "./Navbar.css";
 
 export default function Navbar() {
-  return (
-    <nav className="bg-indigo-600 text-white p-4 flex justify-between">
-      <h1 className="font-bold text-xl">Lipwa Trust</h1>
+  const { user, setUser } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-      <div className="flex gap-4">
-        <Link to="/merchant">Merchant</Link>
-        <Link to="/supplier">Supplier</Link>
-        <Link to="/admin">Admin</Link>
+  const handleLogout = async () => {
+    try {
+      await fetch("http://localhost:8000/auth/logout", { method: "POST", credentials: "include" });
+    } catch (_) {}
+    setUser(null);
+    navigate("/");
+  };
+
+  const links = user?.is_merchant
+    ? [{ to: "/merchant", label: "Dashboard" }]
+    : user?.is_supplier
+    ? [{ to: "/supplier", label: "Dashboard" }]
+    : [{ to: "/admin", label: "Overview" }];
+
+  return (
+    <nav className="navbar">
+      <Link to="/" className="navbar-logo">⬡ Lipwa Trust</Link>
+
+      <div className="navbar-links">
+        {links.map(l => (
+          <Link
+            key={l.to}
+            to={l.to}
+            className={`navbar-link ${location.pathname === l.to ? "active" : ""}`}
+          >
+            {l.label}
+          </Link>
+        ))}
+      </div>
+
+      <div className="navbar-right">
+        {user && (
+          <>
+            <div className="navbar-user">
+              <div className="navbar-avatar">
+                {user.email[0].toUpperCase()}
+              </div>
+              <span className="navbar-email">{user.email}</span>
+            </div>
+            <button className="navbar-logout" onClick={handleLogout}>
+              Sign out
+            </button>
+          </>
+        )}
       </div>
     </nav>
   );
