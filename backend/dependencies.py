@@ -29,7 +29,8 @@ async def get_current_user(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    token = request.cookies.get("access_token") # Extract token from HTTP-only cookie
+    token = request.cookies.get("access_token")
+    print("TOKEN FROM COOKIE:", token) # Extract token from HTTP-only cookie
     if not token:
         # Fallback to header for tools like Swagger UI if cookie isn't available
         token = await oauth2_scheme(request)

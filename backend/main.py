@@ -30,7 +30,9 @@ app = FastAPI(
 )
 
 # --- CORS Middleware ---
-origins = ["*"] # Allow all origins for hackathon MVP
+origins = ["http://localhost:5173",
+           "http://127.0.0.1:5173",
+          ] # Allow all origins for hackathon MVP
 
 app.add_middleware(
     CORSMiddleware,
@@ -100,10 +102,18 @@ async def login_for_access_token(
         httponly=True, 
         samesite="lax", # Strict, Lax, None. Lax is often a good default.
         secure=False, # Set to True in production for HTTPS
-        max_age=int(access_token_expires.total_seconds())
+        max_age=int(access_token_expires.total_seconds()),
+        path="/",
     )
     
     return {"access_token": access_token, "token_type": "bearer"}
+
+# Make sure there are NO spaces before @app
+@app.get("/auth/me", response_model=UserInDB)
+async def get_current_user_info(
+    current_user: User = Depends(get_current_active_user)
+):
+    return current_user    
 
 # Merchant Endpoints
 @app.post("/merchants/onboard", response_model=MerchantDB, summary="Onboard a new merchant (requires login)")
