@@ -1,7 +1,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, symbol_short, token, Address, Env, String, Symbol,
+    contract, contractimpl, contracttype, symbol_short, Address, Env, String, Symbol,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -25,12 +25,10 @@ pub struct CreditContract {
     pub supplier: Address,
     pub platform: Address,
     pub amount: i128,
-    pub escrow_balance: i128,
     pub repaid: i128,
     pub status: ContractStatus,
     pub created_at: u64,
     pub dispatch_deadline: u64,
-    pub token: Address,
 }
 
 #[derive(Clone)]
@@ -88,7 +86,6 @@ impl InventoryCreditContract {
         supplier: Address,
         platform: Address,
         amount: i128,
-        token: Address,
         dispatch_deadline: u64,
     ) {
         if env.storage().instance().has(&DataKey::State) {
@@ -106,12 +103,10 @@ impl InventoryCreditContract {
             supplier,
             platform: platform.clone(),
             amount,
-            escrow_balance: 0,
             repaid: 0,
             status: ContractStatus::Created,
             created_at: env.ledger().timestamp(),
             dispatch_deadline,
-            token,
         };
 
         write_state(&env, &state);
@@ -125,34 +120,26 @@ impl InventoryCreditContract {
         );
     }
 
-    pub fn fund_escrow(env: Env, from: Address, amount: i128) {
+    pub fn approve(env: Env) {
         let mut state = read_state(&env);
-        state.platform.require_auth();
+        state.supplier.require_auth();
+        let caller = state.supplier.clone();
 
-        if from != state.platform {
-            panic!("escrow can only be funded from platform address");
-        }
-        if amount <= 0 {
-            panic!("fund amount must be positive");
-        }
         if state.status != ContractStatus::Created {
-            panic!("fund_escrow allowed only from Created state");
+            panic!("approve allowed only from Created state");
         }
 
         let old_status = state.status.clone();
-        token::Client::new(&env, &state.token).transfer(&from, &env.current_contract_address(), &amount);
-
-        state.escrow_balance += amount;
         state.status = ContractStatus::PendingDispatch;
 
         write_state(&env, &state);
         emit_audit(
             &env,
-            symbol_short!("fund"),
+            symbol_short!("approve"),
             state.contract_id.clone(),
             old_status,
             state.status,
-            from,
+            caller,
         );
     }
 
@@ -192,17 +179,6 @@ impl InventoryCreditContract {
         }
 
         let old_status = state.status.clone();
-        let payout_amount = state.escrow_balance;
-
-        if payout_amount > 0 {
-            token::Client::new(&env, &state.token).transfer(
-                &env.current_contract_address(),
-                &state.supplier,
-                &payout_amount,
-            );
-            state.escrow_balance = 0;
-        }
-
         state.status = ContractStatus::Delivered;
         write_state(&env, &state);
 
@@ -316,17 +292,6 @@ impl InventoryCreditContract {
         }
 
         let old_status = state.status.clone();
-        let refund_amount = state.escrow_balance;
-
-        if refund_amount > 0 {
-            token::Client::new(&env, &state.token).transfer(
-                &env.current_contract_address(),
-                &state.platform,
-                &refund_amount,
-            );
-            state.escrow_balance = 0;
-        }
-
         state.status = ContractStatus::Cancelled;
         write_state(&env, &state);
 

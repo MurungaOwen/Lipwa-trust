@@ -1,10 +1,10 @@
 import { Router } from "express";
 import {
+  approveContract,
   cancelContract,
   confirmDelivery,
   createCreditContract,
   dispatchGoods,
-  fundEscrow,
   getContractState,
   raiseDispute,
   recordRepayment,
@@ -55,22 +55,15 @@ contractsRouter.post("/create", async (req, res) => {
   }
 });
 
-contractsRouter.post("/:id/fund", async (req, res) => {
+contractsRouter.post("/:id/approve", async (req, res) => {
   try {
-    const { fromWalletId, amount } = req.body as {
-      fromWalletId?: string;
-      amount?: number;
-    };
+    const { supplierWalletId } = req.body as { supplierWalletId?: string };
 
-    if (!fromWalletId) {
-      throw new AppError("fromWalletId is required", 400);
+    if (!supplierWalletId) {
+      throw new AppError("supplierWalletId is required", 400);
     }
 
-    if (typeof amount !== "number" || amount <= 0) {
-      throw new AppError("amount must be a positive number", 400);
-    }
-
-    const result = await fundEscrow(req.params.id, fromWalletId, amount);
+    const result = await approveContract(req.params.id, supplierWalletId);
     return res.json(result);
   } catch (error) {
     const statusCode = error instanceof AppError ? error.statusCode : 500;

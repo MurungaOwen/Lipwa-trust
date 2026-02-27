@@ -1,6 +1,6 @@
 # 🔗 Lipwa-Trust — Blockchain Component
 
-The blockchain layer for the Lipwa-Trust inventory financing platform. It provides on-chain settlement, escrow management, and audit logging via **Stellar Soroban** smart contracts, exposed through a **TypeScript HTTP oracle API**.
+The blockchain layer for the Lipwa-Trust inventory financing platform. It provides on-chain contract lifecycle tracking, repayment state, and audit logging via **Stellar Soroban** smart contracts, exposed through a **TypeScript HTTP oracle API**.
 
 ---
 
@@ -12,7 +12,7 @@ Backend (NestJS)  ──HTTP──▶  Oracle API (TypeScript/Express)  ──St
 
 | Layer              | Description                                                                                                                                              |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Smart Contract** | Rust/Soroban contract managing the inventory credit lifecycle: escrow, state transitions, repayment tracking, dispute handling, and audit event emission |
+| **Smart Contract** | Rust/Soroban contract managing the inventory credit lifecycle: approval, dispatch, delivery, repayment tracking, dispute handling, and audit event emission |
 | **Oracle API**     | TypeScript + Express HTTP server that wraps Stellar SDK calls, manages wallets, and exposes contract operations as REST endpoints for the backend        |
 | **Wallet Manager** | Server-side Stellar keypair generation and secure storage in PostgreSQL                                                                                  |
 
@@ -23,7 +23,7 @@ Backend (NestJS)  ──HTTP──▶  Oracle API (TypeScript/Express)  ──St
 ```
 CREATED → PENDING_DISPATCH → DISPATCHED → DELIVERED → REPAYING → SETTLED
                   │
-                  └── DISPUTED → CANCELLED (with escrow refund)
+                  └── DISPUTED → CANCELLED
 ```
 
 Each state transition emits an on-chain audit event queryable via Horizon API.
@@ -208,13 +208,13 @@ Before running the full flow, issue the `KESX` test asset:
 | Method | Endpoint                  | Description                                  |
 | ------ | ------------------------- | -------------------------------------------- |
 | `POST` | `/contracts/create`       | Deploy a new inventory credit contract       |
-| `POST` | `/contracts/:id/fund`     | Fund the contract's escrow                   |
+| `POST` | `/contracts/:id/approve`  | Supplier approves contract terms             |
 | `POST` | `/contracts/:id/dispatch` | Supplier confirms goods dispatched           |
 | `POST` | `/contracts/:id/deliver`  | Merchant confirms delivery (triggers payout) |
 | `POST` | `/contracts/:id/repay`    | Record a repayment installment               |
 | `POST` | `/contracts/:id/settle`   | Finalize a fully-repaid contract             |
 | `POST` | `/contracts/:id/dispute`  | Raise a dispute                              |
-| `POST` | `/contracts/:id/cancel`   | Cancel contract and refund escrow            |
+| `POST` | `/contracts/:id/cancel`   | Cancel contract                              |
 | `GET`  | `/contracts/:id/status`   | Get current contract state                   |
 | `GET`  | `/contracts/:id/events`   | Get audit event log                          |
 
@@ -244,7 +244,7 @@ cargo test
 ```
 
 - Happy path: full lifecycle from creation to settlement
-- Dispute path: dispute raised and contract cancelled with refund
+- Dispute path: dispute raised and contract cancelled
 - Invalid transitions: rejected with errors
 - Authorization checks: only authorized callers can trigger transitions
 
