@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Integer, String, Float, DateTime, ForeignKey
+from sqlalchemy import Boolean, Column, Integer, String, Float, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, relationship
 from sqlalchemy.sql import func
 from enum import Enum
@@ -105,3 +105,32 @@ class Repayment(Base):
     repayment_date = Column(DateTime(timezone=True), server_default=func.now())
 
     contract = relationship("Contract", back_populates="repayments")
+
+
+class BlockchainWallet(Base):
+    __tablename__ = "blockchain_wallets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    owner_type = Column(String, nullable=False)  # merchant | supplier
+    owner_db_id = Column(Integer, nullable=False, index=True)
+    wallet_id = Column(String, nullable=False, unique=True, index=True)
+    public_key = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("owner_type", "owner_db_id", name="uq_blockchain_wallet_owner"),
+    )
+
+
+class BlockchainContractLink(Base):
+    __tablename__ = "blockchain_contract_links"
+
+    id = Column(Integer, primary_key=True, index=True)
+    contract_db_id = Column(Integer, ForeignKey("contracts.id"), nullable=False, unique=True, index=True)
+    blockchain_contract_id = Column(String, nullable=False, unique=True, index=True)
+    create_tx_hash = Column(String, nullable=True)
+    last_tx_hash = Column(String, nullable=True)
+    last_known_status = Column(String, nullable=True)
+    synced_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    contract = relationship("Contract")

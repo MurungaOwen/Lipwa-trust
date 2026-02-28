@@ -57,6 +57,13 @@ function normalizeState(value: unknown): Record<string, unknown> {
 }
 
 function normalizeStatus(status: unknown): string {
+  if (Array.isArray(status)) {
+    if (status.length === 0) {
+      return "Unknown";
+    }
+    return normalizeStatus(status[0]);
+  }
+
   if (typeof status === "string") {
     return status;
   }
@@ -83,6 +90,33 @@ function normalizeStatus(status: unknown): string {
   }
 
   return "Unknown";
+}
+
+function toJsonSafe(value: unknown): unknown {
+  if (typeof value === "bigint") {
+    return value.toString();
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => toJsonSafe(item));
+  }
+
+  if (value instanceof Map) {
+    return Object.fromEntries(
+      Array.from(value.entries(), ([key, mapValue]) => [String(key), toJsonSafe(mapValue)]),
+    );
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, objectValue]) => [
+        key,
+        toJsonSafe(objectValue),
+      ]),
+    );
+  }
+
+  return value;
 }
 
 function toNumber(value: unknown): number {
@@ -255,12 +289,12 @@ export async function getContractState(contractId: string): Promise<{
     throw new AppError(`[CONTRACT] Could not fetch state for ${contractId}`, 500);
   }
 
-  const raw = sdk.scValToNative(retval);
-  const state = normalizeState(raw);
+  const nativeRaw = sdk.scValToNative(retval);
+  const state = normalizeState(nativeRaw);
 
   const amount = toNumber(state.amount);
   const repaid = toNumber(state.repaid);
-  const escrowBalance = toNumber(state.escrow_balance ?? state.escrowBalance);
+  const escrowBalance = 0;
 
   return {
     contractId,
@@ -268,7 +302,7 @@ export async function getContractState(contractId: string): Promise<{
     amount,
     repaid,
     escrowBalance,
-    raw,
+    raw: toJsonSafe(nativeRaw),
   };
 }
 
@@ -282,10 +316,6 @@ export async function createCreditContract(input: {
 
   if (amount <= 0) {
     throw new AppError("amount must be positive", 400);
-  }
-
-  if (!config.kesxTokenContractId) {
-    throw new AppError("KESX_TOKEN_CONTRACT_ID is not configured", 500);
   }
 
   const merchantPublicKey = await getWalletPublicKey(merchantWalletId);
@@ -305,7 +335,6 @@ export async function createCreditContract(input: {
       toScAddress(supplierPublicKey).toScVal(),
       toScAddress(platformPublicKey).toScVal(),
       i128(amount),
-      toScAddress(config.kesxTokenContractId).toScVal(),
       u64(dispatchDeadline),
     ],
     config.platformSecretKey,
@@ -322,26 +351,24 @@ export async function createCreditContract(input: {
   };
 }
 
-export async function fundEscrow(
+export async function approveContract(
   contractId: string,
-  fromWalletId: string,
-  amount: number,
-): Promise<{ txHash: string; escrowBalance: number }> {
-  const fromPublicKey = await getWalletPublicKey(fromWalletId);
-  const fromSecret = await getWalletSecret(fromWalletId);
+  supplierWalletId: string,
+): Promise<{ txHash: string; status: string }> {
+  const supplierSecret = await getWalletSecret(supplierWalletId);
 
   const result = await invokeContract(
     contractId,
-    "fund_escrow",
-    [toScAddress(fromPublicKey).toScVal(), i128(amount)],
-    fromSecret,
+    "approve",
+    [],
+    supplierSecret,
   );
 
   const state = await getContractState(contractId);
 
   return {
     txHash: result.txHash,
-    escrowBalance: state.escrowBalance,
+    status: state.status,
   };
 }
 
@@ -364,7 +391,6 @@ export async function confirmDelivery(
   merchantWalletId: string,
 ): Promise<{ txHash: string; status: string; supplierPayout: number }> {
   const merchantSecret = await getWalletSecret(merchantWalletId);
-  const before = await getContractState(contractId);
 
   const result = await invokeContract(contractId, "deliver", [], merchantSecret);
   const after = await getContractState(contractId);
@@ -372,7 +398,7 @@ export async function confirmDelivery(
   return {
     txHash: result.txHash,
     status: after.status,
-    supplierPayout: before.escrowBalance,
+    supplierPayout: 0,
   };
 }
 
@@ -453,8 +479,6 @@ export async function raiseDispute(
 export async function cancelContract(
   contractId: string,
 ): Promise<{ txHash: string; refundAmount: number; status: string }> {
-  const before = await getContractState(contractId);
-
   const result = await invokeContract(
     contractId,
     "cancel",
@@ -466,7 +490,7 @@ export async function cancelContract(
 
   return {
     txHash: result.txHash,
-    refundAmount: before.escrowBalance,
+    refundAmount: 0,
     status: after.status,
   };
 }

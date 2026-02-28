@@ -8,7 +8,7 @@ import random # Needed for generating merchant/supplier IDs
 
 from trust_score_engine import calculate_trust_score
 from db.session import SessionLocal, engine
-from db.base import Base, Contract, User, ContractStatus # Import User model to use its relationships
+from db.base import Base, Contract, User, ContractStatus, Supplier, Merchant # Import User model to use its relationships
 from models.merchant import MerchantCreate, MerchantDB, TrustScoreResponse, MerchantDashboard
 from models.contract import CreditApplicationRequest, ContractDB
 from models.supplier import SupplierCreate, SupplierDB
@@ -22,6 +22,7 @@ from crud import user as crud_user
 from core.security import verify_password, create_access_token
 from core.config import settings
 from dependencies import get_current_active_user, get_current_merchant_user, get_current_supplier_user # Import dependencies
+from services.blockchain_service import blockchain_service, BlockchainServiceError
 
 app = FastAPI(
     title="Lipwa-Trust Backend",
@@ -249,16 +250,45 @@ async def apply_for_credit(
             detail=f"Amount requested ({request.amount_requested}) exceeds available credit limit ({merchant.credit_limit})."
         )
     
-    # If all checks pass, create the contract
-    amount_approved = request.amount_requested # For MVP, assume approved amount is requested amount if passed checks
+    if request.supplier_db_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="supplier_db_id is required for blockchain-backed credit contracts.",
+        )
+
+    supplier = db.query(Supplier).filter(Supplier.id == request.supplier_db_id).first()
+    if not supplier:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Supplier not found.",
+        )
+
+    # If all checks pass, create the local contract and mirror it on-chain.
+    amount_approved = request.amount_requested
     new_contract = crud_contract.create_contract(
         db=db,
         contract=request,
         amount_approved=amount_approved,
         merchant_db_id=merchant.id,
         merchant_id=merchant.merchant_id,
-        supplier_db_id=request.supplier_db_id if hasattr(request, 'supplier_db_id') else None
+        supplier_db_id=request.supplier_db_id,
+        status=ContractStatus.PENDING,
     )
+
+    try:
+        await blockchain_service.create_credit_contract(
+            db=db,
+            contract_db_id=new_contract.id,
+            merchant=merchant,
+            supplier=supplier,
+            amount=amount_approved,
+        )
+    except BlockchainServiceError as exc:
+        # Keep local and on-chain state consistent if the oracle call fails.
+        db.delete(new_contract)
+        db.commit()
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+
     return new_contract
 
 # Repayment Endpoints
@@ -299,7 +329,18 @@ async def record_repayment(
         if repayment_amount <= 0: # Already fully repaid or more
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Contract already fully repaid.")
         request.amount = repayment_amount # Adjust repayment to settle exactly
-    
+
+    will_settle = bool(
+        contract.amount_approved and (contract.total_repaid + request.amount) >= contract.amount_approved
+    )
+
+    try:
+        await blockchain_service.record_repayment(db=db, contract=contract, amount=request.amount)
+        if will_settle:
+            await blockchain_service.settle_contract(db=db, contract=contract)
+    except BlockchainServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+
     return crud_repayment.create_repayment(db=db, repayment=request)
 
 # Supplier Endpoints
@@ -390,7 +431,7 @@ async def approve_contract(
     current_user: User = Depends(get_current_supplier_user),
     db: Session = Depends(get_db)
 ):
-    """Supplier approves a PENDING contract → status becomes APPROVED."""
+    """Supplier approves a PENDING contract on-chain, then status becomes APPROVED locally."""
     contract = db.query(Contract).filter(Contract.id == contract_id).first()
     if not contract:
         raise HTTPException(status_code=404, detail="Contract not found.")
@@ -399,7 +440,17 @@ async def approve_contract(
     if contract.status != ContractStatus.PENDING.value:
         raise HTTPException(status_code=400, detail=f"Contract is {contract.status}, not PENDING.")
 
-    contract.status = ContractStatus.APPROVED.value
+    try:
+        oracle_result = await blockchain_service.approve_contract(
+            db=db,
+            contract=contract,
+            supplier=current_user.supplier_profile,
+        )
+    except BlockchainServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+
+    mapped_status = blockchain_service.map_oracle_status_to_contract_status(oracle_result.get("status"))
+    contract.status = (mapped_status or ContractStatus.APPROVED).value
     contract.approval_date = datetime.utcnow()
     db.commit()
     db.refresh(contract)
@@ -412,7 +463,7 @@ async def dispatch_contract(
     current_user: User = Depends(get_current_supplier_user),
     db: Session = Depends(get_db)
 ):
-    """Supplier marks goods as dispatched → status becomes DISPATCHED."""
+    """Supplier marks goods as dispatched on-chain, then status becomes DISPATCHED locally."""
     contract = db.query(Contract).filter(Contract.id == contract_id).first()
     if not contract:
         raise HTTPException(status_code=404, detail="Contract not found.")
@@ -421,7 +472,17 @@ async def dispatch_contract(
     if contract.status != ContractStatus.APPROVED.value:
         raise HTTPException(status_code=400, detail=f"Contract must be APPROVED before dispatch. Current: {contract.status}.")
 
-    contract.status = ContractStatus.DISPATCHED.value
+    try:
+        oracle_result = await blockchain_service.dispatch_contract(
+            db=db,
+            contract=contract,
+            supplier=current_user.supplier_profile,
+        )
+    except BlockchainServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+
+    mapped_status = blockchain_service.map_oracle_status_to_contract_status(oracle_result.get("status"))
+    contract.status = (mapped_status or ContractStatus.DISPATCHED).value
     db.commit()
     db.refresh(contract)
     return contract
@@ -433,7 +494,7 @@ async def confirm_delivery(
     current_user: User = Depends(get_current_supplier_user),
     db: Session = Depends(get_db)
 ):
-    """Supplier confirms delivery → status becomes DELIVERED, payout triggered."""
+    """Supplier confirms delivery on-chain → status becomes DELIVERED locally."""
     contract = db.query(Contract).filter(Contract.id == contract_id).first()
     if not contract:
         raise HTTPException(status_code=404, detail="Contract not found.")
@@ -442,9 +503,21 @@ async def confirm_delivery(
     if contract.status != ContractStatus.DISPATCHED.value:
         raise HTTPException(status_code=400, detail=f"Contract must be DISPATCHED before delivery. Current: {contract.status}.")
 
-    contract.status = ContractStatus.DELIVERED.value
-    # TODO (P2): trigger Stellar payout here
-    # e.g. await stellar_oracle.trigger_payout(contract.id, contract.amount_approved)
+    merchant = db.query(Merchant).filter(Merchant.id == contract.merchant_db_id).first()
+    if not merchant:
+        raise HTTPException(status_code=404, detail="Merchant profile not found for this contract.")
+
+    try:
+        oracle_result = await blockchain_service.deliver_contract(
+            db=db,
+            contract=contract,
+            merchant=merchant,
+        )
+    except BlockchainServiceError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+
+    mapped_status = blockchain_service.map_oracle_status_to_contract_status(oracle_result.get("status"))
+    contract.status = (mapped_status or ContractStatus.DELIVERED).value
     db.commit()
     db.refresh(contract)
     return contract
