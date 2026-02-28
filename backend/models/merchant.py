@@ -24,6 +24,8 @@ class MerchantDB(MerchantBase):
     id: int
     trust_score: Optional[int] = None
     credit_limit: Optional[float] = None
+    blockchain_wallet_id: Optional[str] = None
+    blockchain_public_key: Optional[str] = None
     onboarded_at: datetime
 
     class Config:

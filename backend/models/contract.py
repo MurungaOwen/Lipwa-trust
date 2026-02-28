@@ -24,6 +24,7 @@ class ContractDB(ContractBase):
     approval_date: Optional[datetime] = None
     due_date: Optional[datetime] = None
     total_repaid: float
+    blockchain_contract_id: Optional[str] = None
 
     class Config:
         from_attributes = True

@@ -14,6 +14,8 @@ class UserInDBBase(UserBase):
     is_active: bool
     is_merchant: bool
     is_supplier: bool
+    has_merchant_profile: bool = False
+    has_supplier_profile: bool = False
 
     class Config:
         from_attributes = True

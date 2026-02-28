@@ -308,6 +308,22 @@ export default function SupplierDashboard() {
               </div>
             </Card>
 
+            <Card title="Blockchain Wallet (Stellar)">
+              <div className="wallet-info">
+                <div className="wallet-row">
+                  <span className="wallet-label">Connected Wallet ID</span>
+                  <span className="wallet-value monospace">{supplier.blockchain_wallet_id || "Provisioning..."}</span>
+                </div>
+                <div className="wallet-row">
+                  <span className="wallet-label">Public Address</span>
+                  <span className="wallet-value monospace">{supplier.blockchain_public_key || "Provisioning..."}</span>
+                </div>
+                {supplier.blockchain_public_key && (
+                  <p className="wallet-sub">All contract settlements are executed on the Stellar network.</p>
+                )}
+              </div>
+            </Card>
+
             <Card title="Repayment Overview">
               <div className="profile-grid">
                 <ProgressBar

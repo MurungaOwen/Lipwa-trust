@@ -1,5 +1,11 @@
-import { useEffect, useState } from "react";
-import { getMerchantDashboard, getAllSuppliers, applyCredit } from "../api/api";
+import { useEffect, useState, useCallback } from "react";
+import {
+  getMerchantDashboard,
+  getAllSuppliers,
+  applyCredit,
+  simulateRepayment,
+  getContractBlockchainStatus,
+} from "../api/api";
 import Navbar from "../components/Navbar";
 import Card from "../components/Card";
 import ProgressBar from "../components/ProgressBar";
@@ -7,6 +13,7 @@ import "./Dashboard.css";
 import "./MerchantDashboard.css";
 
 const MIN_TRUST_SCORE = 40;
+const STELLAR_EXPERT_BASE = "https://stellar.expert/explorer/testnet";
 
 const STATUS_META = {
   PENDING:    { color: "var(--gold)",  icon: "⏳" },
@@ -18,7 +25,7 @@ const STATUS_META = {
   OVERDUE:    { color: "var(--red)",   icon: "⚠"  },
 };
 
-// ── Loan Modal ────────────────────────────────────────────────────────────────
+// ── Loan Modal ─────────────────────────────────────────────────────────────────
 function LoanModal({ supplier, merchant, onClose, onSuccess }) {
   const [amount, setAmount]   = useState("");
   const [loading, setLoading] = useState(false);
@@ -108,7 +115,185 @@ function LoanModal({ supplier, merchant, onClose, onSuccess }) {
   );
 }
 
-// ── Main Dashboard ────────────────────────────────────────────────────────────
+// ── Repayment Simulator Panel ──────────────────────────────────────────────────
+function RepaymentSimulator({ contract, onSuccess }) {
+  const [amount, setAmount]           = useState("");
+  const [loading, setLoading]         = useState(false);
+  const [chainLoading, setChainLoading] = useState(false);
+  const [result, setResult]           = useState(null);
+  const [chainStatus, setChainStatus] = useState(null);
+  const [error, setError]             = useState("");
+
+  const remaining = (contract.amount_approved || 0) - (contract.total_repaid || 0);
+  const isSettled = contract.status === "SETTLED" || remaining <= 0;
+
+  const handleSimulate = async (e) => {
+    e.preventDefault();
+    const val = parseFloat(amount);
+    if (!val || val <= 0) return setError("Enter a valid payment amount.");
+    setLoading(true);
+    setError("");
+    setResult(null);
+    try {
+      const { data } = await simulateRepayment({
+        contract_id: contract.id,
+        amount: val,
+      });
+      setResult(data);
+      onSuccess();
+    } catch (err) {
+      setError(err.response?.data?.detail || "Simulation failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchChainStatus = async () => {
+    setChainLoading(true);
+    setChainStatus(null);
+    setError("");
+    try {
+      const { data } = await getContractBlockchainStatus(contract.id);
+      setChainStatus(data);
+    } catch (err) {
+      setError(err.response?.data?.detail || "Could not fetch on-chain status.");
+    } finally {
+      setChainLoading(false);
+    }
+  };
+
+  return (
+    <div className="sim-panel">
+      {/* Repayment form */}
+      <div className="sim-section">
+        <h4 className="sim-title">💳 Simulate Repayment</h4>
+        {isSettled ? (
+          <p className="sim-settled">✅ This contract is fully settled — no repayment needed.</p>
+        ) : (
+          <form onSubmit={handleSimulate} className="sim-form">
+            <div className="sim-meta-row">
+              <span className="sim-meta-item">
+                <span className="sim-meta-label">Approved</span>
+                KES {contract.amount_approved?.toLocaleString()}
+              </span>
+              <span className="sim-meta-item">
+                <span className="sim-meta-label">Repaid so far</span>
+                <span style={{ color: "var(--green)" }}>KES {(contract.total_repaid || 0).toLocaleString()}</span>
+              </span>
+              <span className="sim-meta-item">
+                <span className="sim-meta-label">Remaining</span>
+                <span style={{ color: "var(--gold)" }}>KES {remaining.toLocaleString()}</span>
+              </span>
+            </div>
+            <div className="sim-input-row">
+              <input
+                type="number"
+                className="sim-input"
+                placeholder={`Pay up to KES ${remaining.toLocaleString()}`}
+                value={amount}
+                min="1"
+                max={remaining}
+                onChange={(e) => { setAmount(e.target.value); setError(""); setResult(null); }}
+                required
+              />
+              <button
+                type="button"
+                className="sim-btn-fill"
+                onClick={() => setAmount(remaining.toString())}
+              >
+                Pay Full
+              </button>
+              <button type="submit" className="sim-btn" disabled={loading}>
+                {loading ? "Processing…" : "Simulate →"}
+              </button>
+            </div>
+            {error && <p className="sim-error">{error}</p>}
+          </form>
+        )}
+
+        {result && (
+          <div className="sim-result">
+            <div className="sim-result-row">
+              <span>New status</span>
+              <strong style={{ color: result.contract_status === "SETTLED" ? "var(--green)" : "var(--blue)" }}>
+                {result.contract_status}
+              </strong>
+            </div>
+            <div className="sim-result-row">
+              <span>Total repaid</span>
+              <strong style={{ color: "var(--green)" }}>KES {result.total_repaid?.toLocaleString()}</strong>
+            </div>
+            <div className="sim-result-row">
+              <span>Remaining</span>
+              <strong style={{ color: result.remaining > 0 ? "var(--gold)" : "var(--green)" }}>
+                KES {result.remaining?.toLocaleString()}
+              </strong>
+            </div>
+            {result.blockchain?.recorded_on_chain && (
+              <div className="sim-chain-badge">⛓ Recorded on Stellar Testnet</div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* On-chain status fetcher */}
+      <div className="sim-section">
+        <h4 className="sim-title">🔗 Live On-Chain Status</h4>
+        {contract.blockchain_contract_id ? (
+          <>
+            <div className="sim-chain-id">
+              <span className="sim-meta-label">Contract ID</span>
+              <code className="sim-code">{contract.blockchain_contract_id}</code>
+            </div>
+            <div className="sim-links">
+              <a
+                href={`${STELLAR_EXPERT_BASE}/contract/${contract.blockchain_contract_id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="sim-explorer-link"
+              >
+                🌐 View on Stellar.Expert →
+              </a>
+            </div>
+            <button
+              className="sim-btn"
+              onClick={fetchChainStatus}
+              disabled={chainLoading}
+              style={{ marginTop: 12 }}
+            >
+              {chainLoading ? "Fetching…" : "Fetch On-Chain State"}
+            </button>
+
+            {chainStatus && (
+              <div className="sim-result" style={{ marginTop: 12 }}>
+                <div className="sim-result-row">
+                  <span>On-Chain Status</span>
+                  <strong style={{ color: "var(--blue)" }}>{chainStatus.status}</strong>
+                </div>
+                <div className="sim-result-row">
+                  <span>Amount</span>
+                  <strong>{chainStatus.amount?.toLocaleString()} stroops</strong>
+                </div>
+                <div className="sim-result-row">
+                  <span>Repaid On-Chain</span>
+                  <strong style={{ color: "var(--green)" }}>{chainStatus.repaid?.toLocaleString()} stroops</strong>
+                </div>
+                <div className="sim-result-row">
+                  <span>Escrow Balance</span>
+                  <strong style={{ color: "var(--gold)" }}>{chainStatus.escrowBalance?.toLocaleString()} stroops</strong>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="sim-no-chain">No blockchain contract anchored yet for this contract.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Main Dashboard ─────────────────────────────────────────────────────────────
 export default function MerchantDashboard() {
   const [merchant,  setMerchant]  = useState(null);
   const [suppliers, setSuppliers] = useState([]);
@@ -116,21 +301,28 @@ export default function MerchantDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [selected,  setSelected]  = useState(null);
   const [toast,     setToast]     = useState("");
+  const [expandedContract, setExpandedContract] = useState(null);
 
-  const load = () => {
+  const load = useCallback(() => {
     getMerchantDashboard()
       .then(r => setMerchant(r.data))
       .catch(err => setError(err.response?.data?.detail || "Failed to load dashboard."));
     getAllSuppliers()
       .then(r => setSuppliers(r.data))
       .catch(() => {});
-  };
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   const handleSuccess = () => {
     setSelected(null);
     setToast("Loan request submitted successfully!");
+    setTimeout(() => setToast(""), 4000);
+    load();
+  };
+
+  const handleRepaySuccess = () => {
+    setToast("Repayment recorded!");
     setTimeout(() => setToast(""), 4000);
     load();
   };
@@ -255,6 +447,33 @@ export default function MerchantDashboard() {
               </div>
             </Card>
 
+            <Card title="Blockchain Wallet (Stellar)">
+              <div className="wallet-info">
+                <div className="wallet-row">
+                  <span className="wallet-label">Connected Wallet ID</span>
+                  <span className="wallet-value monospace">{merchant.blockchain_wallet_id || "Provisioning..."}</span>
+                </div>
+                <div className="wallet-row">
+                  <span className="wallet-label">Public Address</span>
+                  <span className="wallet-value monospace">{merchant.blockchain_public_key || "Provisioning..."}</span>
+                </div>
+                {merchant.blockchain_public_key && (
+                  <>
+                    <p className="wallet-sub">Your trust score and loan history are anchored on Stellar Testnet.</p>
+                    <a
+                      href={`${STELLAR_EXPERT_BASE}/account/${merchant.blockchain_public_key}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="sim-explorer-link"
+                      style={{ marginTop: 8, display: "inline-block" }}
+                    >
+                      🌐 View Wallet on Stellar.Expert →
+                    </a>
+                  </>
+                )}
+              </div>
+            </Card>
+
             <div className={`eligibility-banner ${canApply ? "eligible" : ""}`}>
               <span>{canApply ? "✅" : "🔒"}</span>
               <div>
@@ -310,6 +529,16 @@ export default function MerchantDashboard() {
                       <p className="supplier-category">{s.product_category || "General Supplies"}</p>
                       <p className="supplier-contact">👤 {s.contact_person}</p>
                       <p className="supplier-contact">📞 {s.phone_number}</p>
+                      {s.blockchain_public_key && (
+                        <a
+                          href={`${STELLAR_EXPERT_BASE}/account/${s.blockchain_public_key}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="supplier-chain-link"
+                        >
+                          ⛓ Verified on Stellar
+                        </a>
+                      )}
                     </div>
                     <button
                       className={`supplier-btn ${!canApply ? "supplier-btn-disabled" : ""}`}
@@ -331,13 +560,8 @@ export default function MerchantDashboard() {
             {!merchant.contracts?.length ? (
               <div className="empty-state">
                 <p>No contracts yet.</p>
-                <p className="empty-sub">
-                  Request a loan from a supplier to get started.
-                </p>
-                <button
-                  className="empty-action"
-                  onClick={() => setActiveTab("suppliers")}
-                >
+                <p className="empty-sub">Request a loan from a supplier to get started.</p>
+                <button className="empty-action" onClick={() => setActiveTab("suppliers")}>
                   Browse suppliers →
                 </button>
               </div>
@@ -345,15 +569,17 @@ export default function MerchantDashboard() {
               <div className="contracts-list">
                 {merchant.contracts.map(c => {
                   const meta = STATUS_META[c.status] || { color: "var(--text-muted)", icon: "·" };
-                  const remaining = c.amount_approved
-                    ? c.amount_approved - (c.total_repaid || 0)
-                    : null;
+                  const remaining = c.amount_approved ? c.amount_approved - (c.total_repaid || 0) : null;
+                  const isExpanded = expandedContract === c.id;
                   return (
                     <div key={c.id} className="contract-row">
                       <div className="contract-info">
                         <div>
                           <span className="contract-id">Contract #{c.id}</span>
                           <span className="contract-mid"> · {c.merchant_id}</span>
+                          {c.blockchain_contract_id && (
+                            <span className="contract-chain-badge">⛓ On-chain</span>
+                          )}
                         </div>
                         <span className="contract-status" style={{ color: meta.color }}>
                           {meta.icon} {c.status}
@@ -390,6 +616,21 @@ export default function MerchantDashboard() {
                           value={c.total_repaid || 0}
                           max={c.amount_approved}
                           label="Repayment progress"
+                        />
+                      )}
+
+                      {/* Expand / Collapse Simulator */}
+                      <button
+                        className="sim-toggle-btn"
+                        onClick={() => setExpandedContract(isExpanded ? null : c.id)}
+                      >
+                        {isExpanded ? "▲ Hide" : "▼ Repayment Simulator & On-Chain Status"}
+                      </button>
+
+                      {isExpanded && (
+                        <RepaymentSimulator
+                          contract={c}
+                          onSuccess={handleRepaySuccess}
                         />
                       )}
                     </div>

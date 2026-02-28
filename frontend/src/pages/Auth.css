@@ -12,12 +12,14 @@
 .auth-page::before {
   content: '';
   position: absolute;
-  width: 500px; height: 500px;
+  width: 500px;
+  height: 500px;
   border-radius: 50%;
   background: var(--gold);
   filter: blur(160px);
   opacity: 0.06;
-  top: -100px; right: -100px;
+  top: -100px;
+  right: -100px;
   pointer-events: none;
 }
 
@@ -30,6 +32,7 @@
   padding: 40px;
   position: relative;
   z-index: 1;
+  box-shadow: var(--shadow-lg);
 }
 
 .auth-logo {
@@ -106,16 +109,20 @@
 .checkbox-label:has(input:checked) {
   border-color: var(--gold);
   background: var(--gold-dim);
-  color: var(--gold-light);
+  color: var(--gold);
 }
 
-.checkbox-label input { accent-color: var(--gold); width: 16px; height: 16px; }
+.checkbox-label input {
+  accent-color: var(--gold);
+  width: 16px;
+  height: 16px;
+}
 
 .auth-btn {
   width: 100%;
   padding: 14px;
   background: var(--gold);
-  color: #0d0f14;
+  color: #ffffff;
   font-weight: 700;
   font-size: 15px;
   border: none;
@@ -125,14 +132,25 @@
   margin-top: 8px;
 }
 
-.auth-btn:hover { background: var(--gold-light); transform: translateY(-1px); }
-.auth-btn:active { transform: translateY(0); }
-.auth-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+.auth-btn:hover {
+  background: var(--gold-light);
+  transform: translateY(-1px);
+}
+
+.auth-btn:active {
+  transform: translateY(0);
+}
+
+.auth-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
 
 .auth-error {
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #fca5a5;
+  background: rgba(201, 42, 42, 0.05);
+  border: 1px solid rgba(201, 42, 42, 0.2);
+  color: #c92a2a;
   border-radius: var(--radius);
   padding: 12px 16px;
   font-size: 13px;
@@ -151,7 +169,9 @@
   font-weight: 500;
 }
 
-.auth-footer a:hover { color: var(--gold-light); }
+.auth-footer a:hover {
+  color: var(--gold-light);
+}
 
 .divider {
   height: 1px;

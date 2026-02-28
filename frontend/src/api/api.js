@@ -14,20 +14,25 @@ export const loginUser = (email, password) => {
     headers: { "Content-Type": "application/x-www-form-urlencoded" }
   });
 };
-export const registerUser   = (data) => api.post("/auth/register", data);
-export const getCurrentUser = ()     => api.get("/auth/me");
+export const registerUser = (data) => api.post("/auth/register", data);
+export const getCurrentUser = () => api.get("/auth/me");
 
 // --- MERCHANT ---
-export const getMerchantDashboard = ()     => api.get("/merchant/me/dashboard");
-export const applyCredit          = (data) => api.post("/credit/apply", data);
-export const recordRepayment      = (data) => api.post("/repayment/settle", data);
+export const getMerchantDashboard = () => api.get("/merchant/me/dashboard");
+export const applyCredit = (data) => api.post("/credit/apply", data);
+export const recordRepayment = (data) => api.post("/repayment/settle", data);
+export const simulateRepayment = (data) => api.post("/repayment/simulate", data);
+export const getContractBlockchainStatus = (contractId) =>
+  api.get(`/contracts/${contractId}/blockchain-status`);
+export const onboardMerchant = (data) => api.post("/merchants/onboard", data);
 
 // --- SUPPLIER ---
-export const getSupplierDashboard = ()  => api.get("/supplier/me/dashboard");
-export const getAllSuppliers       = ()  => api.get("/suppliers");
-export const approveContract      = (id) => api.post(`/supplier/contracts/${id}/approve`);
-export const dispatchContract     = (id) => api.post(`/supplier/contracts/${id}/dispatch`);
-export const confirmDelivery      = (id) => api.post(`/supplier/contracts/${id}/deliver`);
+export const getSupplierDashboard = () => api.get("/supplier/me/dashboard");
+export const getAllSuppliers = () => api.get("/suppliers");
+export const approveContract = (id) => api.post(`/supplier/contracts/${id}/approve`);
+export const dispatchContract = (id) => api.post(`/supplier/contracts/${id}/dispatch`);
+export const confirmDelivery = (id) => api.post(`/supplier/contracts/${id}/deliver`);
+export const onboardSupplier = (data) => api.post("/suppliers/onboard", data);
 
 // --- ADMIN ---
 export const getAdminOverview = () => api.get("/admin/overview");

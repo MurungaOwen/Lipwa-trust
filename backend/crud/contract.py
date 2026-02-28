@@ -16,8 +16,7 @@ def create_contract(db: Session, contract: ContractCreate, amount_approved: floa
         supplier_db_id=supplier_db_id if supplier_db_id else getattr(contract, 'supplier_db_id', None),
         amount_requested=contract.amount_requested,
         amount_approved=amount_approved,
-        status=ContractStatus.APPROVED.value, # Status is APPROVED on creation if it passes checks
-        approval_date=datetime.utcnow(),
+        status=ContractStatus.PENDING.value,   # Starts PENDING — awaiting supplier approval
         due_date=due_date
     )
     db.add(db_contract)

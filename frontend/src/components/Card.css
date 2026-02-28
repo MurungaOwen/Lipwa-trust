@@ -3,14 +3,18 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  transition: border-color 0.2s;
+  box-shadow: var(--shadow);
+  transition: box-shadow 0.2s, transform 0.2s;
 }
 
-.card:hover { border-color: #2e3347; }
+.card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
 
 .card-accent {
-  border-color: rgba(201, 168, 76, 0.3);
-  background: linear-gradient(135deg, var(--surface) 0%, rgba(201, 168, 76, 0.05) 100%);
+  border-color: var(--gold-dim);
+  background: linear-gradient(135deg, var(--surface) 0%, var(--gold-dim) 100%);
 }
 
 .card-header {

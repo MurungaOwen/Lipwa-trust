@@ -3,7 +3,9 @@
   align-items: center;
   padding: 0 32px;
   height: 64px;
-  background: var(--surface);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
@@ -35,8 +37,16 @@
   transition: color 0.2s, background 0.2s;
 }
 
-.navbar-link:hover { color: var(--text); background: var(--surface-2); }
-.navbar-link.active { color: var(--gold); background: var(--gold-dim); }
+.navbar-link:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.navbar-link.active {
+  color: var(--gold);
+  background: var(--gold-dim);
+  font-weight: 600;
+}
 
 .navbar-right {
   display: flex;
@@ -52,7 +62,8 @@
 }
 
 .navbar-avatar {
-  width: 32px; height: 32px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   background: var(--gold-dim);
   border: 1px solid rgba(201, 168, 76, 0.3);

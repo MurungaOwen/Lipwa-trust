@@ -22,9 +22,15 @@ export default function Login() {
       const { data: user } = await getCurrentUser();
       setUser(user);
 
-      if (user.is_merchant) navigate("/merchant");
-      else if (user.is_supplier) navigate("/supplier");
-      else navigate("/admin");
+      if (user.is_merchant) {
+        if (!user.has_merchant_profile) navigate("/onboarding");
+        else navigate("/merchant");
+      } else if (user.is_supplier) {
+        if (!user.has_supplier_profile) navigate("/onboarding");
+        else navigate("/supplier");
+      } else {
+        navigate("/admin");
+      }
     } catch (err) {
       console.error(err);
       setError("Invalid email or password. Please try again.");

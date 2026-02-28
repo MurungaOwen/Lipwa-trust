@@ -43,8 +43,8 @@
   gap: 4px;
   padding: 16px 20px;
   background: var(--surface);
-  border: 1px solid var(--border);
   border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 
 .badge-label {
@@ -108,16 +108,19 @@
 
 .contract-row {
   padding: 20px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
+  background: var(--surface);
   border-radius: var(--radius);
   display: flex;
   flex-direction: column;
   gap: 16px;
-  transition: border-color 0.2s;
+  box-shadow: var(--shadow);
+  transition: box-shadow 0.2s, transform 0.2s;
 }
 
-.contract-row:hover { border-color: #2e3347; }
+.contract-row:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
 
 .contract-info {
   display: flex;
@@ -191,7 +194,8 @@
 }
 
 .status-dot {
-  width: 8px; height: 8px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -208,14 +212,19 @@
 }
 
 .loading-spinner {
-  width: 32px; height: 32px;
+  width: 32px;
+  height: 32px;
   border: 2px solid var(--border);
   border-top-color: var(--gold);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
 
-@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 .dash-error {
   display: flex;
@@ -233,4 +242,41 @@
   padding: 12px 16px;
   border-radius: var(--radius);
   font-size: 13px;
+}
+
+/* Wallet Info */
+.wallet-info {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.wallet-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wallet-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.wallet-value {
+  font-size: 14px;
+  color: var(--text-dim);
+  word-break: break-all;
+}
+
+.monospace {
+  font-family: 'DM Mono', monospace;
+}
+
+.wallet-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-top: 8px;
 }

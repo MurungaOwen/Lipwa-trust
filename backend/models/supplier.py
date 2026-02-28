@@ -17,6 +17,8 @@ class SupplierCreate(SupplierBase):
 
 class SupplierDB(SupplierBase):
     id: int
+    blockchain_wallet_id: Optional[str] = None
+    blockchain_public_key: Optional[str] = None
     onboarded_at: datetime
 
     class Config:

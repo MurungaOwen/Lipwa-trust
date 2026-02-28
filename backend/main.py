@@ -8,7 +8,7 @@ import random # Needed for generating merchant/supplier IDs
 
 from trust_score_engine import calculate_trust_score
 from db.session import SessionLocal, engine
-from db.base import Base, Contract, User, ContractStatus # Import User model to use its relationships
+from db.base import Base, Contract, User, Supplier, Merchant, ContractStatus
 from models.merchant import MerchantCreate, MerchantDB, TrustScoreResponse, MerchantDashboard
 from models.contract import CreditApplicationRequest, ContractDB
 from models.supplier import SupplierCreate, SupplierDB
@@ -22,6 +22,7 @@ from crud import user as crud_user
 from core.security import verify_password, create_access_token
 from core.config import settings
 from dependencies import get_current_active_user, get_current_merchant_user, get_current_supplier_user # Import dependencies
+from core import blockchain
 
 app = FastAPI(
     title="Lipwa-Trust Backend",
@@ -113,7 +114,10 @@ async def login_for_access_token(
 async def get_current_user_info(
     current_user: User = Depends(get_current_active_user)
 ):
-    return current_user    
+    user_data = UserInDB.model_validate(current_user)
+    user_data.has_merchant_profile = current_user.merchant_profile is not None
+    user_data.has_supplier_profile = current_user.supplier_profile is not None
+    return user_data
 
 # Merchant Endpoints
 @app.post("/merchants/onboard", response_model=MerchantDB, summary="Onboard a new merchant (requires login)")
@@ -124,12 +128,10 @@ async def onboard_merchant(
 ):
     """
     Onboards a new merchant into the Lipwa-Trust system, linking it to the logged-in user.
-    - User must be logged in and not already a merchant.
+    - User must be logged in.
     - Calculates an initial trust score and credit limit.
     """
-    if current_user.is_merchant:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User is already a merchant.")
-    if current_user.merchant_profile: # Additional check if profile exists but flag not set
+    if current_user.merchant_profile:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User already has a merchant profile.")
 
     # Generate a unique merchant_id (since it's no longer from request body)
@@ -158,6 +160,15 @@ async def onboard_merchant(
 
     # Update user's is_merchant flag
     crud_user.update_user_is_merchant(db, current_user.id, True)
+
+    # Blockchain Wallet Creation
+    wallet_data = await blockchain.create_blockchain_wallet(owner_id=new_merchant.merchant_id, wallet_type="merchant")
+    if wallet_data:
+        new_merchant.blockchain_wallet_id = wallet_data.get("walletId")
+        new_merchant.blockchain_public_key = wallet_data.get("publicKey")
+        db.add(new_merchant)
+        db.commit()
+        db.refresh(new_merchant)
     
     return new_merchant
 
@@ -249,16 +260,48 @@ async def apply_for_credit(
             detail=f"Amount requested ({request.amount_requested}) exceeds available credit limit ({merchant.credit_limit})."
         )
     
-    # If all checks pass, create the contract
-    amount_approved = request.amount_requested # For MVP, assume approved amount is requested amount if passed checks
+    # If all checks pass, create the contract (starts PENDING — supplier must approve)
+    amount_approved = request.amount_requested
     new_contract = crud_contract.create_contract(
-        db=db,
-        contract=request,
-        amount_approved=amount_approved,
-        merchant_db_id=merchant.id,
+        db,
+        request,
+        amount_approved,
+        merchant.id,
         merchant_id=merchant.merchant_id,
-        supplier_db_id=request.supplier_db_id if hasattr(request, 'supplier_db_id') else None
+        supplier_db_id=getattr(request, 'supplier_db_id', None)
     )
+    print(f"[BACKEND] Created contract #{new_contract.id} for merchant {merchant.merchant_id} amount={amount_approved}")
+
+    # Blockchain Contract Creation (when both wallets exist)
+    supplier = None
+    if request.supplier_db_id:
+        supplier = db.query(Supplier).filter(Supplier.id == request.supplier_db_id).first()
+
+    if merchant.blockchain_wallet_id and supplier and supplier.blockchain_wallet_id:
+        print(f"[BLOCKCHAIN] Creating on-chain contract: merchant_wallet={merchant.blockchain_wallet_id} supplier_wallet={supplier.blockchain_wallet_id} amount={amount_approved}")
+        contract_data = await blockchain.create_blockchain_contract(
+            merchant_wallet_id=merchant.blockchain_wallet_id,
+            supplier_wallet_id=supplier.blockchain_wallet_id,
+            amount=amount_approved,
+            deadline_hours=settings.BLOCKCHAIN_DISPATCH_DEADLINE_HOURS
+        )
+        if contract_data:
+            bc_id = contract_data.get("contractId")
+            new_contract.blockchain_contract_id = bc_id
+            db.add(new_contract)
+            db.commit()
+            db.refresh(new_contract)
+            print(f"[BLOCKCHAIN] ✅ On-chain contract created: {bc_id}")
+            print(f"[BLOCKCHAIN] 🌐 View at: https://stellar.expert/explorer/testnet/contract/{bc_id}")
+        else:
+            print(f"[BLOCKCHAIN] ⚠ Oracle did not return contractId. Contract saved off-chain only.")
+    else:
+        missing = []
+        if not merchant.blockchain_wallet_id: missing.append("merchant wallet")
+        if not supplier: missing.append("supplier not found")
+        elif not supplier.blockchain_wallet_id: missing.append("supplier wallet")
+        print(f"[BLOCKCHAIN] Skipping on-chain contract — missing: {', '.join(missing)}")
+
     return new_contract
 
 # Repayment Endpoints
@@ -300,7 +343,13 @@ async def record_repayment(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Contract already fully repaid.")
         request.amount = repayment_amount # Adjust repayment to settle exactly
     
-    return crud_repayment.create_repayment(db=db, repayment=request)
+    res = crud_repayment.create_repayment(db=db, repayment=request)
+    
+    # Blockchain Repayment
+    if contract.blockchain_contract_id:
+        await blockchain.record_blockchain_repayment(contract.blockchain_contract_id, request.amount)
+        
+    return res
 
 # Supplier Endpoints
 @app.post("/suppliers/onboard", response_model=SupplierDB, summary="Onboard a new supplier (requires login)")
@@ -311,11 +360,9 @@ async def onboard_supplier(
 ):
     """
     Onboards a new supplier into the Lipwa-Trust system, linking it to the logged-in user.
-    - User must be logged in and not already a supplier.
+    - User must be logged in.
     """
-    if current_user.is_supplier:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User is already a supplier.")
-    if current_user.supplier_profile: # Additional check if profile exists but flag not set
+    if current_user.supplier_profile:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User already has a supplier profile.")
 
     # Generate a unique supplier_id
@@ -336,6 +383,15 @@ async def onboard_supplier(
 
     # Update user's is_supplier flag
     crud_user.update_user_is_supplier(db, current_user.id, True)
+
+    # Blockchain Wallet Creation
+    wallet_data = await blockchain.create_blockchain_wallet(owner_id=new_supplier.supplier_id, wallet_type="supplier")
+    if wallet_data:
+        new_supplier.blockchain_wallet_id = wallet_data.get("walletId")
+        new_supplier.blockchain_public_key = wallet_data.get("publicKey")
+        db.add(new_supplier)
+        db.commit()
+        db.refresh(new_supplier)
     
     return new_supplier
 
@@ -390,7 +446,7 @@ async def approve_contract(
     current_user: User = Depends(get_current_supplier_user),
     db: Session = Depends(get_db)
 ):
-    """Supplier approves a PENDING contract → status becomes APPROVED."""
+    """Supplier approves a PENDING contract → status becomes APPROVED, escrow funded on-chain."""
     contract = db.query(Contract).filter(Contract.id == contract_id).first()
     if not contract:
         raise HTTPException(status_code=404, detail="Contract not found.")
@@ -403,6 +459,21 @@ async def approve_contract(
     contract.approval_date = datetime.utcnow()
     db.commit()
     db.refresh(contract)
+    print(f"[BACKEND] Contract #{contract_id} approved by supplier {current_user.supplier_profile.supplier_id}")
+
+    # Blockchain: Fund Escrow
+    if contract.blockchain_contract_id and current_user.supplier_profile.blockchain_wallet_id:
+        print(f"[BLOCKCHAIN] Funding escrow for contract {contract.blockchain_contract_id} amount={contract.amount_approved}")
+        ok = await blockchain.fund_blockchain_contract(
+            contract_id=contract.blockchain_contract_id,
+            from_wallet_id=current_user.supplier_profile.blockchain_wallet_id,
+            amount=contract.amount_approved
+        )
+        if ok:
+            print(f"[BLOCKCHAIN] ✅ Escrow funded for {contract.blockchain_contract_id}")
+        else:
+            print(f"[BLOCKCHAIN] ⚠ Escrow funding failed for {contract.blockchain_contract_id}")
+
     return contract
 
 
@@ -422,6 +493,19 @@ async def dispatch_contract(
         raise HTTPException(status_code=400, detail=f"Contract must be APPROVED before dispatch. Current: {contract.status}.")
 
     contract.status = ContractStatus.DISPATCHED.value
+
+    # Blockchain Dispatch
+    if contract.blockchain_contract_id and current_user.supplier_profile.blockchain_wallet_id:
+        print(f"[BLOCKCHAIN] Dispatching goods for contract {contract.blockchain_contract_id}")
+        ok = await blockchain.dispatch_blockchain_goods(
+            contract.blockchain_contract_id,
+            current_user.supplier_profile.blockchain_wallet_id
+        )
+        if ok:
+            print(f"[BLOCKCHAIN] ✅ Dispatch recorded on-chain for {contract.blockchain_contract_id}")
+        else:
+            print(f"[BLOCKCHAIN] ⚠ Dispatch oracle call failed for {contract.blockchain_contract_id}")
+
     db.commit()
     db.refresh(contract)
     return contract
@@ -443,8 +527,19 @@ async def confirm_delivery(
         raise HTTPException(status_code=400, detail=f"Contract must be DISPATCHED before delivery. Current: {contract.status}.")
 
     contract.status = ContractStatus.DELIVERED.value
-    # TODO (P2): trigger Stellar payout here
-    # e.g. await stellar_oracle.trigger_payout(contract.id, contract.amount_approved)
+
+    # Blockchain Delivery — use the MERCHANT's wallet (loaded from contract relationship)
+    if contract.blockchain_contract_id and contract.merchant and contract.merchant.blockchain_wallet_id:
+        print(f"[BLOCKCHAIN] Confirming delivery for contract {contract.blockchain_contract_id}")
+        ok = await blockchain.confirm_blockchain_delivery(
+            contract.blockchain_contract_id,
+            contract.merchant.blockchain_wallet_id
+        )
+        if ok:
+            print(f"[BLOCKCHAIN] ✅ Delivery confirmed, payout triggered for {contract.blockchain_contract_id}")
+        else:
+            print(f"[BLOCKCHAIN] ⚠ Delivery confirmation failed for {contract.blockchain_contract_id}")
+
     db.commit()
     db.refresh(contract)
     return contract
@@ -512,6 +607,82 @@ async def get_all_suppliers(
     """
     suppliers = crud_supplier.get_all_suppliers(db, skip=skip, limit=limit)
     return suppliers
+
+@app.get("/contracts/{contract_id}/blockchain-status", summary="Get live on-chain status for a contract")
+async def get_contract_blockchain_status(
+    contract_id: int,
+    current_user: User = Depends(get_current_merchant_user),
+    db: Session = Depends(get_db)
+):
+    """Fetches the live on-chain state for a contract from the Stellar oracle."""
+    contract = db.query(Contract).filter(Contract.id == contract_id).first()
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found.")
+    if contract.merchant_db_id != current_user.merchant_profile.id:
+        raise HTTPException(status_code=403, detail="Not your contract.")
+    if not contract.blockchain_contract_id:
+        return {"error": "No blockchain contract ID for this contract.", "on_chain": False}
+
+    on_chain = await blockchain.get_blockchain_contract_status(contract.blockchain_contract_id)
+    if not on_chain:
+        raise HTTPException(status_code=502, detail="Could not reach blockchain oracle.")
+
+    stellar_explorer_url = (
+        f"https://stellar.expert/explorer/testnet/contract/{contract.blockchain_contract_id}"
+    )
+    return {
+        **on_chain,
+        "on_chain": True,
+        "blockchain_contract_id": contract.blockchain_contract_id,
+        "explorer_url": stellar_explorer_url,
+    }
+
+
+@app.post("/repayment/simulate", summary="Simulate a repayment for a contract (merchant only)")
+async def simulate_repayment(
+    request: RepaymentCreate,
+    current_user: User = Depends(get_current_merchant_user),
+    db: Session = Depends(get_db)
+):
+    """Simulate a repayment — same as /repayment/settle but clearly marked as a simulation endpoint."""
+    merchant = current_user.merchant_profile
+    if not merchant:
+        raise HTTPException(status_code=404, detail="Merchant profile not found.")
+
+    contract = db.query(Contract).filter(Contract.id == request.contract_id).first()
+    if not contract:
+        raise HTTPException(status_code=404, detail="Contract not found.")
+    if contract.merchant_db_id != merchant.id:
+        raise HTTPException(status_code=403, detail="Contract does not belong to you.")
+    if contract.status == ContractStatus.SETTLED.value:
+        raise HTTPException(status_code=400, detail="Contract is already settled.")
+    if contract.status == ContractStatus.REJECTED.value:
+        raise HTTPException(status_code=400, detail="Contract was rejected.")
+
+    remaining = (contract.amount_approved or 0) - (contract.total_repaid or 0)
+    if remaining <= 0:
+        raise HTTPException(status_code=400, detail="Contract already fully repaid.")
+    
+    pay_amount = min(request.amount, remaining)
+    request.amount = pay_amount
+
+    res = crud_repayment.create_repayment(db=db, repayment=request)
+
+    blockchain_result = None
+    if contract.blockchain_contract_id:
+        ok = await blockchain.record_blockchain_repayment(contract.blockchain_contract_id, pay_amount)
+        blockchain_result = {"recorded_on_chain": ok, "blockchain_contract_id": contract.blockchain_contract_id}
+
+    # Refresh contract to get updated status
+    db.refresh(contract)
+    return {
+        "repayment": RepaymentDB.model_validate(res).model_dump(),
+        "contract_status": contract.status,
+        "total_repaid": contract.total_repaid,
+        "remaining": max(0, (contract.amount_approved or 0) - (contract.total_repaid or 0)),
+        "blockchain": blockchain_result,
+    }
+
 
 @app.get("/", summary="Root endpoint")
 async def root():

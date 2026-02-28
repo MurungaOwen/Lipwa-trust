@@ -42,6 +42,10 @@ class Merchant(Base):
     trust_score = Column(Integer, nullable=True)
     credit_limit = Column(Float, nullable=True)
     
+    # Blockchain fields
+    blockchain_wallet_id = Column(String, nullable=True)
+    blockchain_public_key = Column(String, nullable=True)
+    
     onboarded_at = Column(DateTime(timezone=True), server_default=func.now())
 
     contracts = relationship("Contract", back_populates="merchant")
@@ -67,6 +71,9 @@ class Contract(Base):
     amount_approved = Column(Float, nullable=True)
     status = Column(String, default=ContractStatus.PENDING.value, nullable=False)
     
+    # Blockchain fields
+    blockchain_contract_id = Column(String, nullable=True)
+    
     request_date = Column(DateTime(timezone=True), server_default=func.now())
     approval_date = Column(DateTime(timezone=True), nullable=True)
     due_date = Column(DateTime(timezone=True), nullable=True) # Expected repayment date
@@ -91,6 +98,10 @@ class Supplier(Base):
     
     user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=True) # Link to User
     user = relationship("User", back_populates="supplier_profile") # Relationship
+    
+    # Blockchain fields
+    blockchain_wallet_id = Column(String, nullable=True)
+    blockchain_public_key = Column(String, nullable=True)
     
     onboarded_at = Column(DateTime(timezone=True), server_default=func.now())
     
